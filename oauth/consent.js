@@ -16,11 +16,16 @@
   const client = window.supabase.createClient(url, key, { auth: { storageKey: 'guppy-connect-auth', persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } });
   const trusted = ['chatgpt.com', 'chat.openai.com', 'openai.com'];
 
-  // Only follow redirects Supabase returns to an https address.
+  // A desktop app (such as the ChatGPT Mac app) receives its sign-in on this computer, at a
+  // loopback address (RFC 8252); anything else must be https.
+  const loopback = host => host === '127.0.0.1' || host === 'localhost' || host === '[::1]';
+  const safe = target => target.protocol === 'https:' || (target.protocol === 'http:' && loopback(target.hostname));
+
+  // Only follow redirects Supabase returns to a safe address.
   async function leave(redirect) {
     let target;
     try { target = new URL(redirect); } catch { fail('The app gave an invalid return address.'); return; }
-    if (target.protocol !== 'https:') { fail('The app gave an unsafe return address.'); return; }
+    if (!safe(target)) { fail('The app gave an unsafe return address.'); return; }
     await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
     status(`Returning you to ${target.hostname}…`);
     location.assign(target.href);
@@ -33,12 +38,15 @@
     if (data.redirect_url) { await leave(data.redirect_url); return; }
     let returnHost = '';
     try { returnHost = new URL(data.redirect_uri).hostname; } catch { /* Shown as given. */ }
+    const local = loopback(returnHost);
     $('client-name').textContent = data.client?.name || 'An unnamed app';
-    $('client-return').textContent = returnHost || data.redirect_uri;
+    $('client-return').textContent = local ? 'An app on this computer' : returnHost || data.redirect_uri;
     $('client-uri').textContent = data.client?.uri || '—';
     $('account').textContent = data.user?.email ?? '';
     const known = trusted.some(host => returnHost === host || returnHost.endsWith(`.${host}`));
-    $('warning').textContent = known ? '' : `This app returns to ${returnHost || 'an unknown address'}, not ChatGPT. Only allow it if you're sure you started this connection.`;
+    $('warning').textContent = known ? ''
+      : local ? 'This is an app on this computer, such as the ChatGPT desktop app. Only allow it if you just clicked Authenticate or Connect in that app yourself.'
+      : `This app returns to ${returnHost || 'an unknown address'}, not ChatGPT. Only allow it if you're sure you started this connection.`;
     show('warning', !known);
     status('');
     show('sign-in', false);
