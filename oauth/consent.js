@@ -14,7 +14,8 @@
   const id = new URLSearchParams(location.search).get('authorization_id');
   const { url, key } = window.GUPPY_CONNECT ?? {};
   const client = window.supabase.createClient(url, key, { auth: { storageKey: 'guppy-connect-auth', persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } });
-  const trusted = ['chatgpt.com', 'chat.openai.com', 'openai.com'];
+  // Assistants the owner uses; anything else gets a warning before Allow.
+  const trusted = ['chatgpt.com', 'chat.openai.com', 'openai.com', 'claude.ai', 'claude.com'];
 
   // A desktop app (such as the ChatGPT Mac app) receives its sign-in on this computer, at a
   // loopback address (RFC 8252); anything else must be https.
@@ -46,7 +47,7 @@
     const known = trusted.some(host => returnHost === host || returnHost.endsWith(`.${host}`));
     $('warning').textContent = known ? ''
       : local ? 'This is an app on this computer, such as the ChatGPT desktop app. Only allow it if you just clicked Authenticate or Connect in that app yourself.'
-      : `This app returns to ${returnHost || 'an unknown address'}, not ChatGPT. Only allow it if you're sure you started this connection.`;
+      : `This app returns to ${returnHost || 'an unknown address'}, not ChatGPT or Claude. Only allow it if you're sure you started this connection.`;
     show('warning', !known);
     status('');
     show('sign-in', false);
